@@ -13,7 +13,7 @@
 #include <fcntl.h>
 #include <sys/time.h>
 
-#define NEWFILE (O_WRONLY|O_CREAT|O_TRUNC)
+#define NEWFILE (O_WRONLY | O_CREAT | O_TRUNC)
 #define MYTCP_PORT 4950
 #define MYUDP_PORT 5350
 #define BUFSIZE 60000
@@ -21,19 +21,39 @@
 #define NAK 0
 #define ACK 1
 
-#define ERROR_PROB 0.1 
+#define ERROR_PROB 0.1
 #define DATALEN 500
 #define PACKLEN 508
 #define HEADLEN 8
 
-struct pack_so {
-    uint32_t seq_no;      // Sequence number
-    uint32_t len;         // Length of data
-    char data[DATALEN];   // Data
-    uint32_t checksum;    // For error detection
+struct pack_so
+{
+    uint32_t seq_no;    // Sequence number
+    uint32_t len;       // Length of data
+    char data[DATALEN]; // Data
+    uint32_t checksum;  // For error detection
 };
 
-struct ack_so {
-    uint32_t seq_no;     // Sequence number being acknowledged 
-    uint8_t status;      // ACK or NAK
+struct ack_so
+{
+    uint32_t seq_no; // Sequence number being acknowledged
+    uint8_t status;  // ACK or NAK
 };
+
+uint32_t calculate_checksum(char *data, int len)
+{
+    uint32_t sum = 0;
+    for (int i = 0; i < len; i++)
+    {
+        sum += (uint8_t)data[i];
+    }
+    return sum;
+}
+
+int simulate_error()
+{
+    // Generate random number between 0 and 999
+    int random = rand() % 1000;
+    // Return 1 (error) if number is less than error probability * 1000
+    return random < (ERROR_PROB * 1000);
+}
