@@ -31,13 +31,11 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    int iteration_count = 0;
-
-    while (iteration_count < iterations)
+    for (int i = 0; i < iterations; i++)
     {
         struct timeval tv;
         gettimeofday(&tv, NULL);
-        srand(tv.tv_usec ^ getpid() ^ getppid() ^ iteration_count); // Seed the random number generator with time, PID, PPID, and iteration
+        srand(tv.tv_usec ^ getpid() ^ getppid() ^ i); // Seed the random number generator with time, PID, PPID, and iteration
 
         int sockfd, con_fd, ret;
         struct sockaddr_in my_addr;
@@ -70,23 +68,29 @@ int main(int argc, char *argv[])
             exit(1);
         }
 
-        printf("waiting for data\n");
-        sin_size = sizeof(struct sockaddr_in);
-        con_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size); // accept the packet
-        if (con_fd < 0)
+        while (1)
         {
-            printf("error in accept\n");
-            exit(1);
+            printf("waiting for data\n");
+            sin_size = sizeof(struct sockaddr_in);
+            con_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size); // accept the packet
+            if (con_fd < 0)
+            {
+                printf("error in accept\n");
+                exit(1);
+            }
+
+            if ((pid = fork()) == 0) // create acceptance process
+            {
+                close(sockfd);
+                str_ser(con_fd, data_unit_size, error_prob); // receive packet and response
+                close(con_fd);
+                exit(0);
+            }
+            else
+                close(con_fd); // parent process
         }
-
-        str_ser(con_fd, data_unit_size, error_prob); // receive packet and response
-        close(con_fd);
         close(sockfd);
-
-        iteration_count++;
     }
-
-    printf("Completed all iterations.\n");
     exit(0);
 }
 
