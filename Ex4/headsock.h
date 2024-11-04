@@ -21,17 +21,15 @@
 #define NAK 0
 #define ACK 1
 
-#define ERROR_PROB 0.1
-#define DATALEN 500
 #define PACKLEN 508
 #define HEADLEN 8
 
 struct pack_so
 {
-    uint32_t seq_no;    // Sequence number
-    uint32_t len;       // Length of data
-    char data[DATALEN]; // Data
-    uint32_t checksum;  // For error detection
+    uint32_t seq_no;   // Sequence number
+    uint32_t len;      // Length of data
+    uint32_t checksum; // For error detection
+    char data[];       // Data (variable length)
 };
 
 struct ack_so
@@ -50,10 +48,10 @@ uint32_t calculate_checksum(char *data, int len)
     return sum;
 }
 
-int simulate_error()
+int simulate_error(double error_prob)
 {
     // Generate random number between 0 and 999
     int random = rand() % 1000;
     // Return 1 (error) if number is less than error probability * 1000
-    return random < (ERROR_PROB * 1000);
+    return random < (error_prob * 1000);
 }

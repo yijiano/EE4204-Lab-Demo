@@ -3,13 +3,36 @@ tcp_client.c: the source file of the client in tcp transmission
 ********************************/
 
 #include "headsock.h"
+#include <stdio.h>
+#include <string.h>
+#include <time.h>     // Include time.h for seeding the random number generator
+#include <unistd.h>   // Include unistd.h for getpid() and getppid()
+#include <sys/time.h> // Include sys/time.h for gettimeofday()
 
-float str_cli(FILE *fp, int sockfd, long *len); // transmission function
-
-void tv_sub(struct timeval *out, struct timeval *in); // calcu the time interval between out and in
+float str_cli(FILE *fp, int sockfd, long *len, int data_unit_size); // transmission function
+void tv_sub(struct timeval *out, struct timeval *in);               // calculate the time interval between out and in
 
 int main(int argc, char **argv)
 {
+    if (argc != 4)
+    {
+        fprintf(stderr, "Usage: %s <IP address> <data unit size> <error probability>\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
+
+    int data_unit_size = atoi(argv[2]);
+    double error_prob = atof(argv[3]);
+
+    if (data_unit_size <= 0 || error_prob < 0 || error_prob > 1)
+    {
+        fprintf(stderr, "Invalid arguments\n");
+        exit(EXIT_FAILURE);
+    }
+
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    srand(tv.tv_usec ^ getpid() ^ getppid()); // Seed the random number generator with time, PID, and PPID
+
     int sockfd, ret;
     float ti, rt;
     long len;
@@ -19,15 +42,10 @@ int main(int argc, char **argv)
     struct in_addr **addrs;
     FILE *fp;
 
-    if (argc != 2)
-    {
-        printf("parameters not match");
-    }
-
     sh = gethostbyname(argv[1]); // get host's information
     if (sh == NULL)
     {
-        printf("error when gethostby name");
+        printf("error when gethostbyname");
         exit(0);
     }
 
@@ -65,27 +83,24 @@ int main(int argc, char **argv)
 
     if ((fp = fopen("myfile.txt", "r+t")) == NULL)
     {
-        printf("File doesn't exit\n");
+        printf("File doesn't exist\n");
         exit(0);
     }
 
-    ti = str_cli(fp, sockfd, &len); // perform the transmission and receiving
-    rt = (len / (float)ti);         // caculate the average transmission rate
+    ti = str_cli(fp, sockfd, &len, data_unit_size); // perform the transmission and receiving
+    rt = (len / (float)ti);                         // calculate the average transmission rate
     printf("Time(ms) : %.3f, Data sent(byte): %d\nData rate: %f (Kbytes/s)\n", ti, (int)len, rt);
 
     close(sockfd);
     fclose(fp);
-    //}
     exit(0);
 }
 
-// Modified str_cli function in tcp_client3.c
-
-float str_cli(FILE *fp, int sockfd, long *len)
+float str_cli(FILE *fp, int sockfd, long *len, int data_unit_size)
 {
     char *buf;
     long lsize, ci = 0;
-    struct pack_so packet;
+    struct pack_so *packet;
     struct ack_so ack;
     int n, slen;
     float time_inv = 0.0;
@@ -97,7 +112,7 @@ float str_cli(FILE *fp, int sockfd, long *len)
     lsize = ftell(fp);
     rewind(fp);
     printf("File length: %d bytes\n", (int)lsize);
-    printf("Packet length: %d bytes\n", DATALEN);
+    printf("Packet length: %d bytes\n", data_unit_size);
 
     buf = (char *)malloc(lsize);
     if (buf == NULL)
@@ -110,21 +125,24 @@ float str_cli(FILE *fp, int sockfd, long *len)
     // Transmit file using stop-and-wait
     while (ci <= lsize)
     {
+        // Allocate memory for packet with variable data length
+        packet = (struct pack_so *)malloc(sizeof(struct pack_so) + data_unit_size);
+
         // Prepare packet
-        packet.seq_no = seq_no;
-        if ((lsize + 1 - ci) <= DATALEN)
+        packet->seq_no = seq_no;
+        if ((lsize + 1 - ci) <= data_unit_size)
             slen = lsize + 1 - ci;
         else
-            slen = DATALEN;
+            slen = data_unit_size;
 
-        packet.len = slen;
-        memcpy(packet.data, buf + ci, slen);
-        packet.checksum = calculate_checksum(packet.data, slen);
+        packet->len = slen;
+        memcpy(packet->data, buf + ci, slen);
+        packet->checksum = calculate_checksum(packet->data, slen);
 
         while (1)
         {
             // Send packet
-            n = send(sockfd, &packet, sizeof(struct pack_so), 0);
+            n = send(sockfd, packet, sizeof(struct pack_so) + slen, 0);
             if (n == -1)
             {
                 printf("Send error!\n");
@@ -151,6 +169,7 @@ float str_cli(FILE *fp, int sockfd, long *len)
 
         ci += slen;
         seq_no++;
+        free(packet);
     }
 
     gettimeofday(&recvt, NULL);

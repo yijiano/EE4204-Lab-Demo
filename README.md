@@ -4,6 +4,16 @@
 
 This lab assignment focuses on implementing a client server socket program with TCP transport protocol for transferring messages using a flow control protocol. Problems 1-3 were provided as practice, while Problem 4 was the main assignment.
 
+For Ex4 specifically, please run the following commands:
+
+```sh
+# Run the server
+./tcp_ser4 <data unit size> <error probability>
+
+# Run the client
+./tcp_client4 <IP address> <data unit size> <error probability>
+```
+
 ## Problems
 
 ### Problem 1

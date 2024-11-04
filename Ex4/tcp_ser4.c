@@ -3,19 +3,41 @@ tcp_ser.c: the source file of the server in tcp transmission
 ***********************************/
 
 #include "headsock.h"
+#include <stdio.h>
+#include <string.h>
+#include <time.h>     // Include time.h for seeding the random number generator
+#include <unistd.h>   // Include unistd.h for getpid() and getppid()
+#include <sys/time.h> // Include sys/time.h for gettimeofday()
 
 #define BACKLOG 10
 
-void str_ser(int sockfd); // transmitting and receiving function
+void str_ser(int sockfd, int data_unit_size, double error_prob); // transmitting and receiving function
 
-int main(void)
+int main(int argc, char *argv[])
 {
+    if (argc != 3)
+    {
+        fprintf(stderr, "Usage: %s <data unit size> <error probability>\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
+
+    int data_unit_size = atoi(argv[1]);
+    double error_prob = atof(argv[2]);
+
+    if (data_unit_size <= 0 || error_prob < 0 || error_prob > 1)
+    {
+        fprintf(stderr, "Invalid arguments\n");
+        exit(EXIT_FAILURE);
+    }
+
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    srand(tv.tv_usec ^ getpid() ^ getppid()); // Seed the random number generator with time, PID, and PPID
+
     int sockfd, con_fd, ret;
     struct sockaddr_in my_addr;
     struct sockaddr_in their_addr;
     int sin_size;
-
-    //	char *buf;
     pid_t pid;
 
     sockfd = socket(AF_INET, SOCK_STREAM, 0); // create socket
@@ -54,10 +76,10 @@ int main(void)
             exit(1);
         }
 
-        if ((pid = fork()) == 0) // creat acception process
+        if ((pid = fork()) == 0) // create acceptance process
         {
             close(sockfd);
-            str_ser(con_fd); // receive packet and response
+            str_ser(con_fd, data_unit_size, error_prob); // receive packet and response
             close(con_fd);
             exit(0);
         }
@@ -68,11 +90,11 @@ int main(void)
     exit(0);
 }
 
-void str_ser(int sockfd)
+void str_ser(int sockfd, int data_unit_size, double error_prob)
 {
     char buf[BUFSIZE];
     FILE *fp;
-    struct pack_so packet;
+    struct pack_so *packet;
     struct ack_so ack;
     int n = 0;
     long lseek = 0;
@@ -82,8 +104,11 @@ void str_ser(int sockfd)
 
     while (1)
     {
+        // Allocate memory for packet with variable data length
+        packet = (struct pack_so *)malloc(sizeof(struct pack_so) + data_unit_size);
+
         // Receive packet
-        n = recv(sockfd, &packet, sizeof(struct pack_so), 0);
+        n = recv(sockfd, packet, sizeof(struct pack_so) + data_unit_size, 0);
         if (n == -1)
         {
             printf("Error receiving packet\n");
@@ -91,47 +116,51 @@ void str_ser(int sockfd)
         }
 
         // Simulate random errors
-        if (simulate_error())
+        if (simulate_error(error_prob))
         {
             // Send NAK
-            ack.seq_no = packet.seq_no;
+            ack.seq_no = packet->seq_no;
             ack.status = NAK;
             send(sockfd, &ack, sizeof(struct ack_so), 0);
-            printf("Packet %d corrupted, requesting retransmission\n", packet.seq_no);
+            printf("Packet %d corrupted, requesting retransmission\n", packet->seq_no);
+            free(packet);
             continue;
         }
 
         // Verify checksum
-        uint32_t calculated_checksum = calculate_checksum(packet.data, packet.len);
-        if (calculated_checksum != packet.checksum)
+        uint32_t calculated_checksum = calculate_checksum(packet->data, packet->len);
+        if (calculated_checksum != packet->checksum)
         {
             // Send NAK
-            ack.seq_no = packet.seq_no;
+            ack.seq_no = packet->seq_no;
             ack.status = NAK;
             send(sockfd, &ack, sizeof(struct ack_so), 0);
-            printf("Checksum error in packet %d\n", packet.seq_no);
+            printf("Checksum error in packet %d\n", packet->seq_no);
+            free(packet);
             continue;
         }
 
         // Check sequence number
-        if (packet.seq_no == expected_seq)
+        if (packet->seq_no == expected_seq)
         {
             // Copy data to buffer
-            memcpy(buf + lseek, packet.data, packet.len);
-            lseek += packet.len;
+            memcpy(buf + lseek, packet->data, packet->len);
+            lseek += packet->len;
             expected_seq++;
 
             // Send ACK
-            ack.seq_no = packet.seq_no;
+            ack.seq_no = packet->seq_no;
             ack.status = ACK;
             send(sockfd, &ack, sizeof(struct ack_so), 0);
 
             // Check if this is the last packet
-            if (packet.data[packet.len - 1] == '\0')
+            if (packet->data[packet->len - 1] == '\0')
             {
+                free(packet);
                 break;
             }
         }
+        free(packet);
     }
 
     // Write received data to file
