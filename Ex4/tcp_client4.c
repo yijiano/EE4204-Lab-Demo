@@ -34,7 +34,7 @@ int main(int argc, char **argv)
     {
         struct timeval tv;
         gettimeofday(&tv, NULL);
-        srand(tv.tv_usec ^ getpid() ^ getppid() ^ i); // Seed the random number generator with time, PID, PPID, and iteration
+        srand(tv.tv_usec ^ getpid() ^ (i + 1)); // Seed the random number generator with time, PID, and iteration
 
         int sockfd, ret;
         float ti, rt;
@@ -87,6 +87,7 @@ int main(int argc, char **argv)
         if ((fp = fopen("myfile.txt", "r+t")) == NULL)
         {
             printf("File doesn't exist\n");
+            close(sockfd);
             exit(0);
         }
 
@@ -150,6 +151,7 @@ float str_cli(FILE *fp, int sockfd, long *len, int data_unit_size)
             if (n == -1)
             {
                 printf("Send error!\n");
+                free(packet);
                 exit(1);
             }
 
@@ -158,6 +160,7 @@ float str_cli(FILE *fp, int sockfd, long *len, int data_unit_size)
             if (n == -1)
             {
                 printf("Error receiving ACK\n");
+                free(packet);
                 exit(1);
             }
 
