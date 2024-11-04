@@ -15,58 +15,61 @@ void str_ser(int sockfd, int data_unit_size, double error_prob); // transmitting
 
 int main(int argc, char *argv[])
 {
-    if (argc != 3)
+    if (argc != 4)
     {
-        fprintf(stderr, "Usage: %s <data unit size> <error probability>\n", argv[0]);
+        fprintf(stderr, "Usage: %s <data unit size> <error probability> <iterations>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
     int data_unit_size = atoi(argv[1]);
     double error_prob = atof(argv[2]);
+    int iterations = atoi(argv[3]);
 
-    if (data_unit_size <= 0 || error_prob < 0 || error_prob > 1)
+    if (data_unit_size <= 0 || error_prob < 0 || error_prob > 1 || iterations <= 0)
     {
         fprintf(stderr, "Invalid arguments\n");
         exit(EXIT_FAILURE);
     }
 
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    srand(tv.tv_usec ^ getpid() ^ getppid()); // Seed the random number generator with time, PID, and PPID
+    int iteration_count = 0;
 
-    int sockfd, con_fd, ret;
-    struct sockaddr_in my_addr;
-    struct sockaddr_in their_addr;
-    int sin_size;
-    pid_t pid;
-
-    sockfd = socket(AF_INET, SOCK_STREAM, 0); // create socket
-    if (sockfd < 0)
+    while (iteration_count < iterations)
     {
-        printf("error in socket!");
-        exit(1);
-    }
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        srand(tv.tv_usec ^ getpid() ^ getppid() ^ iteration_count); // Seed the random number generator with time, PID, PPID, and iteration
 
-    my_addr.sin_family = AF_INET;
-    my_addr.sin_port = htons(MYTCP_PORT);
-    my_addr.sin_addr.s_addr = htonl(INADDR_ANY); // inet_addr("172.0.0.1");
-    bzero(&(my_addr.sin_zero), 8);
-    ret = bind(sockfd, (struct sockaddr *)&my_addr, sizeof(struct sockaddr)); // bind socket
-    if (ret < 0)
-    {
-        printf("error in binding");
-        exit(1);
-    }
+        int sockfd, con_fd, ret;
+        struct sockaddr_in my_addr;
+        struct sockaddr_in their_addr;
+        int sin_size;
+        pid_t pid;
 
-    ret = listen(sockfd, BACKLOG); // listen
-    if (ret < 0)
-    {
-        printf("error in listening");
-        exit(1);
-    }
+        sockfd = socket(AF_INET, SOCK_STREAM, 0); // create socket
+        if (sockfd < 0)
+        {
+            printf("error in socket!");
+            exit(1);
+        }
 
-    while (1)
-    {
+        my_addr.sin_family = AF_INET;
+        my_addr.sin_port = htons(MYTCP_PORT);
+        my_addr.sin_addr.s_addr = htonl(INADDR_ANY); // inet_addr("172.0.0.1");
+        bzero(&(my_addr.sin_zero), 8);
+        ret = bind(sockfd, (struct sockaddr *)&my_addr, sizeof(struct sockaddr)); // bind socket
+        if (ret < 0)
+        {
+            printf("error in binding");
+            exit(1);
+        }
+
+        ret = listen(sockfd, BACKLOG); // listen
+        if (ret < 0)
+        {
+            printf("error in listening");
+            exit(1);
+        }
+
         printf("waiting for data\n");
         sin_size = sizeof(struct sockaddr_in);
         con_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size); // accept the packet
@@ -76,17 +79,14 @@ int main(int argc, char *argv[])
             exit(1);
         }
 
-        if ((pid = fork()) == 0) // create acceptance process
-        {
-            close(sockfd);
-            str_ser(con_fd, data_unit_size, error_prob); // receive packet and response
-            close(con_fd);
-            exit(0);
-        }
-        else
-            close(con_fd); // parent process
+        str_ser(con_fd, data_unit_size, error_prob); // receive packet and response
+        close(con_fd);
+        close(sockfd);
+
+        iteration_count++;
     }
-    close(sockfd);
+
+    printf("Completed all iterations.\n");
     exit(0);
 }
 

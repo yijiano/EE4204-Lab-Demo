@@ -8,10 +8,10 @@ For Ex4 specifically, please run the following commands:
 
 ```sh
 # Run the server
-./tcp_ser4 <data unit size> <error probability>
+./tcp_ser4 <data unit size> <error probability> <num of iterations>
 
 # Run the client
-./tcp_client4 <IP address> <data unit size> <error probability>
+./tcp_client4 <IP address> <data unit size> <error probability> <num of iterations>
 ```
 
 ## Problems
