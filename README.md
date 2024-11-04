@@ -26,7 +26,7 @@ Choose appropriate values for parameters such as data unit size and error probab
 
 You may also want to simulate errors with a certain probability by generating a random number. For example, to simulate error probability 0.1, generate a random number in the range between 0 and 999; if this number falls within the range 0 to 99, then assume there is an error in the data unit received, otherwise there is no error.
 
-Repeat the experiement several times and plot the average values in a report with a brief description of results, assumptions makde, etc. 
+Repeat the experiement several times and plot the average values in a report with a brief description of results, assumptions made, etc. 
 
 Choose at least 6 values for data unit size in the range between 200 and 1400 bytes. 
 
