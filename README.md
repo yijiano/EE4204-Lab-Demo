@@ -22,7 +22,7 @@ Develop a TCP-based client-serever socket program for transferring a large messa
 
 Develop a TCP-based client-server socket program for transferring a large message. Here, the message transmitted from the client to server is read from a large file. The message is split into short data-units which are sent by using **stop-and-wait flow control.** Also, a data-unit sent **could be damaged with some error probability.** Verify if the file has been sent completely and correctly by comparing throughput for various sizes of data-units. Also, measure the performance for various error probabilities and for the error-free scenario.
 
-Choose appropriate values for parameters such as data unit size and error probability. You can simulare errors according to the frame error probability. YOu are free to implement the ARQ in your own way, but with stop-and-wait. For example, you may want to avoid TIMEOUTs and handle retransmissions in some other way (you may want to choose negaive acknowledgement). 
+Choose appropriate values for parameters such as data unit size and error probability. You can simulare errors according to the frame error probability. You are free to implement the ARQ in your own way, but with stop-and-wait. For example, you may want to avoid TIMEOUTs and handle retransmissions in some other way (you may want to choose negaive acknowledgement). 
 
 You may also want to simulate errors with a certain probability by generating a random number. For example, to simulate error probability 0.1, generate a random number in the range between 0 and 999; if this number falls within the range 0 to 99, then assume there is an error in the data unit received, otherwise there is no error.
 
