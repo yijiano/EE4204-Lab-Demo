@@ -1,7 +1,3 @@
-/**********************************
-tcp_ser.c: the source file of the server in tcp transmission
-***********************************/
-
 #include "headsock.h"
 #include <stdio.h>
 #include <string.h>
@@ -31,66 +27,67 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    for (int i = 0; i < iterations; i++)
+    int sockfd, con_fd, ret;
+    struct sockaddr_in my_addr;
+    struct sockaddr_in their_addr;
+    int sin_size;
+    pid_t pid;
+
+    sockfd = socket(AF_INET, SOCK_STREAM, 0); // create socket
+    if (sockfd < 0)
     {
-        struct timeval tv;
-        gettimeofday(&tv, NULL);
-        srand(tv.tv_usec ^ getpid() ^ getppid() ^ i); // Seed the random number generator with time, PID, PPID, and iteration
-
-        int sockfd, con_fd, ret;
-        struct sockaddr_in my_addr;
-        struct sockaddr_in their_addr;
-        int sin_size;
-        pid_t pid;
-
-        sockfd = socket(AF_INET, SOCK_STREAM, 0); // create socket
-        if (sockfd < 0)
-        {
-            printf("error in socket!");
-            exit(1);
-        }
-
-        my_addr.sin_family = AF_INET;
-        my_addr.sin_port = htons(MYTCP_PORT);
-        my_addr.sin_addr.s_addr = htonl(INADDR_ANY); // inet_addr("172.0.0.1");
-        bzero(&(my_addr.sin_zero), 8);
-        ret = bind(sockfd, (struct sockaddr *)&my_addr, sizeof(struct sockaddr)); // bind socket
-        if (ret < 0)
-        {
-            printf("error in binding");
-            exit(1);
-        }
-
-        ret = listen(sockfd, BACKLOG); // listen
-        if (ret < 0)
-        {
-            printf("error in listening");
-            exit(1);
-        }
-
-        while (1)
-        {
-            printf("waiting for data\n");
-            sin_size = sizeof(struct sockaddr_in);
-            con_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size); // accept the packet
-            if (con_fd < 0)
-            {
-                printf("error in accept\n");
-                exit(1);
-            }
-
-            if ((pid = fork()) == 0) // create acceptance process
-            {
-                close(sockfd);
-                str_ser(con_fd, data_unit_size, error_prob); // receive packet and response
-                close(con_fd);
-                exit(0);
-            }
-            else
-                close(con_fd); // parent process
-        }
-        close(sockfd);
+        printf("error in socket!");
+        exit(1);
     }
+
+    my_addr.sin_family = AF_INET;
+    my_addr.sin_port = htons(MYTCP_PORT);
+    my_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    bzero(&(my_addr.sin_zero), 8);
+    ret = bind(sockfd, (struct sockaddr *)&my_addr, sizeof(struct sockaddr));
+    if (ret < 0)
+    {
+        printf("error in binding");
+        exit(1);
+    }
+
+    ret = listen(sockfd, BACKLOG);
+    if (ret < 0)
+    {
+        printf("error in listening");
+        exit(1);
+    }
+
+    while (1)
+    {
+        printf("waiting for data\n");
+        sin_size = sizeof(struct sockaddr_in);
+        con_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
+        if (con_fd < 0)
+        {
+            printf("error in accept\n");
+            exit(1);
+        }
+
+        if ((pid = fork()) == 0)
+        {
+            close(sockfd);
+            // Generate a unique seed for each connection
+            struct timeval tv;
+            gettimeofday(&tv, NULL);
+            unsigned int seed = tv.tv_sec * 1000000 + tv.tv_usec;
+            seed ^= getpid(); // XOR with process ID
+            seed ^= rand();   // XOR with another random number
+            srand(seed);      // Set the new seed
+
+            str_ser(con_fd, data_unit_size, error_prob);
+            close(con_fd);
+            exit(0);
+        }
+        else
+            close(con_fd);
+    }
+    close(sockfd);
     exit(0);
 }
 
@@ -108,10 +105,8 @@ void str_ser(int sockfd, int data_unit_size, double error_prob)
 
     while (1)
     {
-        // Allocate memory for packet with variable data length
         packet = (struct pack_so *)malloc(sizeof(struct pack_so) + data_unit_size);
 
-        // Receive packet
         n = recv(sockfd, packet, sizeof(struct pack_so) + data_unit_size, 0);
         if (n == -1)
         {
@@ -119,10 +114,9 @@ void str_ser(int sockfd, int data_unit_size, double error_prob)
             exit(1);
         }
 
-        // Simulate random errors
+        // Simulate random errors with newly seeded random number generator
         if (simulate_error(error_prob))
         {
-            // Send NAK
             ack.seq_no = packet->seq_no;
             ack.status = NAK;
             send(sockfd, &ack, sizeof(struct ack_so), 0);
@@ -131,11 +125,9 @@ void str_ser(int sockfd, int data_unit_size, double error_prob)
             continue;
         }
 
-        // Verify checksum
         uint32_t calculated_checksum = calculate_checksum(packet->data, packet->len);
         if (calculated_checksum != packet->checksum)
         {
-            // Send NAK
             ack.seq_no = packet->seq_no;
             ack.status = NAK;
             send(sockfd, &ack, sizeof(struct ack_so), 0);
@@ -144,20 +136,16 @@ void str_ser(int sockfd, int data_unit_size, double error_prob)
             continue;
         }
 
-        // Check sequence number
         if (packet->seq_no == expected_seq)
         {
-            // Copy data to buffer
             memcpy(buf + lseek, packet->data, packet->len);
             lseek += packet->len;
             expected_seq++;
 
-            // Send ACK
             ack.seq_no = packet->seq_no;
             ack.status = ACK;
             send(sockfd, &ack, sizeof(struct ack_so), 0);
 
-            // Check if this is the last packet
             if (packet->data[packet->len - 1] == '\0')
             {
                 free(packet);
@@ -167,7 +155,6 @@ void str_ser(int sockfd, int data_unit_size, double error_prob)
         free(packet);
     }
 
-    // Write received data to file
     if ((fp = fopen("myTCPreceive.txt", "wt")) == NULL)
     {
         printf("Cannot create file\n");
