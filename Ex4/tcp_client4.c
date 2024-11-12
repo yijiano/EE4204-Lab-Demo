@@ -6,12 +6,13 @@
 #include <sys/time.h>
 
 // Structure to store statistics for each iteration
-struct iteration_stats {
+struct iteration_stats
+{
     float time_ms;
     long bytes_sent;
-    float throughput_raw;     // bytes/ms
-    float throughput_kbps;    // KBytes/s
-    float theoretical_kbps;   // Theoretical throughput in KBytes/s
+    float throughput_raw;   // bytes/ms
+    float throughput_kbps;  // KBytes/s
+    float theoretical_kbps; // Theoretical throughput in KBytes/s
 };
 
 float str_cli(FILE *fp, int sockfd, long *len, int data_unit_size);
@@ -21,7 +22,8 @@ float calculate_theoretical_throughput(float error_prob, int data_unit_size, flo
 
 int main(int argc, char **argv)
 {
-    if (argc != 5) {
+    if (argc != 5)
+    {
         fprintf(stderr, "Usage: %s <IP address> <data unit size> <error probability> <iterations>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
@@ -30,19 +32,22 @@ int main(int argc, char **argv)
     double error_prob = atof(argv[3]);
     int iterations = atoi(argv[4]);
 
-    if (data_unit_size <= 0 || error_prob < 0 || error_prob > 1 || iterations <= 0) {
+    if (data_unit_size <= 0 || error_prob < 0 || error_prob > 1 || iterations <= 0)
+    {
         fprintf(stderr, "Invalid arguments\n");
         exit(EXIT_FAILURE);
     }
 
     // Allocate memory for storing statistics
     struct iteration_stats *stats = malloc(iterations * sizeof(struct iteration_stats));
-    if (stats == NULL) {
+    if (stats == NULL)
+    {
         fprintf(stderr, "Failed to allocate memory for statistics\n");
         exit(EXIT_FAILURE);
     }
 
-    for (int i = 0; i < iterations; i++) {
+    for (int i = 0; i < iterations; i++)
+    {
         struct timeval tv;
         gettimeofday(&tv, NULL);
         srand(tv.tv_usec ^ getpid() ^ (i + 1));
@@ -57,7 +62,8 @@ int main(int argc, char **argv)
         FILE *fp;
 
         sh = gethostbyname(argv[1]);
-        if (sh == NULL) {
+        if (sh == NULL)
+        {
             printf("error when gethostbyname");
             free(stats);
             exit(0);
@@ -67,18 +73,20 @@ int main(int argc, char **argv)
         printf("canonical name: %s\n", sh->h_name);
         for (pptr = sh->h_aliases; *pptr != NULL; pptr++)
             printf("the aliases name is: %s\n", *pptr);
-        switch (sh->h_addrtype) {
-            case AF_INET:
-                printf("AF_INET\n");
-                break;
-            default:
-                printf("unknown addrtype\n");
-                break;
+        switch (sh->h_addrtype)
+        {
+        case AF_INET:
+            printf("AF_INET\n");
+            break;
+        default:
+            printf("unknown addrtype\n");
+            break;
         }
 
         addrs = (struct in_addr **)sh->h_addr_list;
         sockfd = socket(AF_INET, SOCK_STREAM, 0);
-        if (sockfd < 0) {
+        if (sockfd < 0)
+        {
             printf("error in socket");
             free(stats);
             exit(1);
@@ -88,25 +96,27 @@ int main(int argc, char **argv)
         memcpy(&(ser_addr.sin_addr.s_addr), *addrs, sizeof(struct in_addr));
         bzero(&(ser_addr.sin_zero), 8);
         ret = connect(sockfd, (struct sockaddr *)&ser_addr, sizeof(struct sockaddr));
-        if (ret != 0) {
+        if (ret != 0)
+        {
             printf("connection failed\n");
             close(sockfd);
             free(stats);
             exit(1);
         }
 
-        if ((fp = fopen("myfile.txt", "r+t")) == NULL) {
+        if ((fp = fopen("myfile.txt", "r+t")) == NULL)
+        {
             printf("File doesn't exist\n");
             close(sockfd);
             free(stats);
             exit(0);
         }
 
-        ti = str_cli(fp, sockfd, &len, data_unit_size);  // returns time in milliseconds
+        ti = str_cli(fp, sockfd, &len, data_unit_size); // returns time in milliseconds
 
         // Calculate throughput metrics
-        float throughput_raw = len / (float)ti;  // bytes per millisecond
-        float throughput_kbps = (len / 1024.0) * 1000.0 / ti;  // KBytes per second
+        float throughput_raw = len / (float)ti;               // bytes per millisecond
+        float throughput_kbps = (len / 1024.0) * 1000.0 / ti; // KBytes per second
         float theoretical_kbps = calculate_theoretical_throughput(error_prob, data_unit_size, 1.0);
 
         // Store statistics for this iteration
@@ -122,8 +132,8 @@ int main(int argc, char **argv)
         printf("Raw throughput: %.2f bytes/ms\n", throughput_raw);
         printf("Actual throughput: %.2f KBytes/s\n", throughput_kbps);
         printf("Theoretical throughput: %.2f KBytes/s\n", theoretical_kbps);
-        printf("Efficiency ratio (actual/theoretical): %.2f%%\n", 
-                (throughput_kbps/theoretical_kbps) * 100);
+        printf("Efficiency ratio (actual/theoretical): %.2f%%\n",
+               (throughput_kbps / theoretical_kbps) * 100);
         printf("==========================\n");
 
         close(sockfd);
@@ -143,56 +153,28 @@ float calculate_theoretical_throughput(float error_prob, int data_unit_size, flo
     // Based on Stop-and-Wait ARQ formula: Throughput = (1-p)/(1+2a)
     // where p is error probability and a is propagation_time/transmission_time
     float p = error_prob;
-    float transmission_time = data_unit_size / 1000.0;  // assuming 1 byte per microsecond
-    float propagation_time = base_time_ms;  // base RTT without errors
+    float transmission_time = data_unit_size / 1000.0; // assuming 1 byte per microsecond
+    float propagation_time = base_time_ms;             // base RTT without errors
     float a = propagation_time / transmission_time;
 
-    float theoretical_throughput = (1-p)/(1+2*a);
-    return theoretical_throughput * (data_unit_size/1024.0) * 1000.0;  // Convert to KBytes/s
+    float theoretical_throughput = (1 - p) / (1 + 2 * a);
+    return theoretical_throughput * (data_unit_size / 1024.0) * 1000.0; // Convert to KBytes/s
 }
 
 void print_summary_statistics(struct iteration_stats *stats, int iterations)
 {
     float total_time = 0;
-    long total_bytes = 0;
-    float total_throughput_raw = 0;
     float total_throughput_kbps = 0;
-    float total_theoretical_kbps = 0;
 
-    float min_throughput_kbps = stats[0].throughput_kbps;
-    float max_throughput_kbps = stats[0].throughput_kbps;
-    float min_time = stats[0].time_ms;
-    float max_time = stats[0].time_ms;
-
-    for (int i = 0; i < iterations; i++) {
+    for (int i = 0; i < iterations; i++)
+    {
         total_time += stats[i].time_ms;
-        total_bytes += stats[i].bytes_sent;
-        total_throughput_raw += stats[i].throughput_raw;
         total_throughput_kbps += stats[i].throughput_kbps;
-        total_theoretical_kbps += stats[i].theoretical_kbps;
-
-        if (stats[i].throughput_kbps < min_throughput_kbps)
-            min_throughput_kbps = stats[i].throughput_kbps;
-        if (stats[i].throughput_kbps > max_throughput_kbps)
-            max_throughput_kbps = stats[i].throughput_kbps;
-        if (stats[i].time_ms < min_time)
-            min_time = stats[i].time_ms;
-        if (stats[i].time_ms > max_time)
-            max_time = stats[i].time_ms;
     }
 
     printf("\n=== Summary Statistics (%d iterations) ===\n", iterations);
-    printf("Average time: %.3f ms (min: %.3f ms, max: %.3f ms)\n",
-            total_time / iterations, min_time, max_time);
-    printf("Average data sent: %ld bytes\n", total_bytes / iterations);
-    printf("Average raw throughput: %.2f bytes/ms\n", 
-            total_throughput_raw / iterations);
-    printf("Average actual throughput: %.2f KBytes/s (min: %.2f KBytes/s, max: %.2f KBytes/s)\n",
-            total_throughput_kbps / iterations, min_throughput_kbps, max_throughput_kbps);
-    printf("Average theoretical throughput: %.2f KBytes/s\n", 
-            total_theoretical_kbps / iterations);
-    printf("Average efficiency ratio: %.2f%%\n", 
-            (total_throughput_kbps/total_theoretical_kbps) * 100);
+    printf("Average transfer time: %.3f ms\n", total_time / iterations);
+    printf("Average throughput: %.2f KBytes/s\n", total_throughput_kbps / iterations);
     printf("=====================================\n");
 }
 
@@ -281,4 +263,3 @@ void tv_sub(struct timeval *out, struct timeval *in)
     }
     out->tv_sec -= in->tv_sec;
 }
-
