@@ -115,23 +115,11 @@ void str_ser(int sockfd, int data_unit_size, double error_prob)
         }
 
         // Simulate random errors with newly seeded random number generator
-        if (simulate_error(error_prob))
+        if (simulate_error(error_prob) ||
+            calculate_checksum(packet->data, packet->len) != packet->checksum)
         {
-            ack.seq_no = packet->seq_no;
-            ack.status = NAK;
-            send(sockfd, &ack, sizeof(struct ack_so), 0);
-            printf("Packet %d corrupted, requesting retransmission\n", packet->seq_no);
-            free(packet);
-            continue;
-        }
-
-        uint32_t calculated_checksum = calculate_checksum(packet->data, packet->len);
-        if (calculated_checksum != packet->checksum)
-        {
-            ack.seq_no = packet->seq_no;
-            ack.status = NAK;
-            send(sockfd, &ack, sizeof(struct ack_so), 0);
-            printf("Checksum error in packet %d\n", packet->seq_no);
+            // On error, don't send anything - let client timeout
+            printf("Packet %d corrupted or error simulated\n", packet->seq_no);
             free(packet);
             continue;
         }
@@ -142,8 +130,8 @@ void str_ser(int sockfd, int data_unit_size, double error_prob)
             lseek += packet->len;
             expected_seq++;
 
+            // Send ACK
             ack.seq_no = packet->seq_no;
-            ack.status = ACK;
             send(sockfd, &ack, sizeof(struct ack_so), 0);
 
             if (packet->data[packet->len - 1] == '\0')

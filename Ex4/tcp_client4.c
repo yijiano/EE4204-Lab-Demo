@@ -189,6 +189,18 @@ float str_cli(FILE *fp, int sockfd, long *len, int data_unit_size)
     struct timeval sendt, recvt;
     uint32_t seq_no = 0;
 
+    // Add timeout settings
+    struct timeval timeout;
+    timeout.tv_sec = 0;     // 0 seconds
+    timeout.tv_usec = 6000; // 6ms timeout
+
+    // Set socket timeout options
+    if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout, sizeof(timeout)) < 0)
+    {
+        printf("setsockopt failed\n");
+        exit(1);
+    }
+
     fseek(fp, 0, SEEK_END);
     lsize = ftell(fp);
     rewind(fp);
@@ -230,15 +242,22 @@ float str_cli(FILE *fp, int sockfd, long *len, int data_unit_size)
             n = recv(sockfd, &ack, sizeof(struct ack_so), 0);
             if (n == -1)
             {
-                printf("Error receiving ACK\n");
-                free(packet);
-                exit(1);
+                if (errno == EAGAIN || errno == EWOULDBLOCK)
+                {
+                    // Timeout occurred
+                    printf("Timeout for packet %d, retransmitting\n", seq_no);
+                    continue; // Retransmit packet
+                }
+                else
+                {
+                    printf("Error receiving ACK\n");
+                    free(packet);
+                    exit(1);
+                }
             }
 
-            if (ack.seq_no == seq_no && ack.status == ACK)
-                break;
-
-            printf("Received NAK for packet %d, retransmitting\n", seq_no);
+            if (ack.seq_no == seq_no) // Only check sequence number
+                break;                // Got ACK for current packet, move to next one
         }
 
         ci += slen;
