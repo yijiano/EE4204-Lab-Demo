@@ -49,5 +49,11 @@ Include the following performance figures in your report:
 3) Transfer time vs data unit size (2 graphs; error probability = 0/0.1)
 3) Throughput vs data unit size (2 graphs; error probability = 0/0.1)
 
+### Results
+
+![](./assets/resutls1.png)
+
+![](./assets/resutls2.png)
+
 ## References
 The intructions/questions here were taken from the `.pdf` file provided by the course coordinator, which can be found in this repo.
