@@ -51,9 +51,9 @@ Include the following performance figures in your report:
 
 ### Results
 
-![](./Ex4/assets/resutls1.png)
+![](./Ex4/assets/results1.png)
 
-![](./Ex4/assets/resutls2.png)
+![](./Ex4/assets/results2.png)
 
 ## References
 The intructions/questions here were taken from the `.pdf` file provided by the course coordinator, which can be found in this repo.
